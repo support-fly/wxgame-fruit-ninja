@@ -10,6 +10,7 @@ import PowerUp from './js/runtime/powerup'
 import Blade from './js/player/blade'
 import Score from './js/ui/score'
 import GameOver from './js/ui/gameOver'
+import StartScreen from './js/ui/startScreen'
 import AudioManager from './js/base/audioManager'
 import PowerUpManager from './js/base/powerupManager'
 import LevelSystem from './js/base/levelSystem'
@@ -40,6 +41,7 @@ export default class Main {
     this.blade = new Blade(ctx)
     this.scoreUI = new Score(ctx)
     this.gameOverUI = new GameOver(ctx)
+    this.startScreen = new StartScreen(ctx)
     this.audioManager = new AudioManager()
     this.powerupManager = new PowerUpManager()
     this.levelSystem = new LevelSystem()
@@ -287,6 +289,12 @@ export default class Main {
    * 更新游戏逻辑
    */
   update() {
+    if (this.state === GAME_STATE.READY) {
+      // 开始界面动画
+      this.startScreen.update()
+      return
+    }
+    
     if (this.state !== GAME_STATE.PLAYING) return
     
     // 更新道具管理器
@@ -502,12 +510,8 @@ export default class Main {
     } else if (this.state === GAME_STATE.OVER) {
       this.gameOverUI.render()
     } else if (this.state === GAME_STATE.READY) {
-      // 显示开始提示
-      ctx.fillStyle = '#fff'
-      ctx.font = 'bold 30px Arial'
-      ctx.textAlign = 'center'
-      ctx.fillText('Touch to Start', windowWidth / 2, windowHeight / 2)
-      ctx.textAlign = 'left'
+      // 渲染开始界面
+      this.startScreen.render()
     }
   }
   
