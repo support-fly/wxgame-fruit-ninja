@@ -12,6 +12,7 @@ import Score from './js/ui/score'
 import GameOver from './js/ui/gameOver'
 import AudioManager from './js/base/audioManager'
 import PowerUpManager from './js/base/powerupManager'
+import LevelSystem from './js/base/levelSystem'
 
 const ctx = canvas.getContext('2d')
 const { windowWidth, windowHeight } = wx.getSystemInfoSync()
@@ -41,10 +42,15 @@ export default class Main {
     this.gameOverUI = new GameOver(ctx)
     this.audioManager = new AudioManager()
     this.powerupManager = new PowerUpManager()
+    this.levelSystem = new LevelSystem()
     
     // 生成水果的定时器
     this.spawnTimer = 0
-    this.spawnInterval = 60 // 每60帧生成一次
+    this.spawnInterval = this.levelSystem.getSpawnInterval()
+    
+    // 升级提示
+    this.levelUpMessage = null
+    this.levelUpTimer = 0
     
     // 触摸事件
     this.touchStartX = 0
@@ -184,6 +190,23 @@ export default class Main {
     
     this.score += (points + bonus) * multiplier
     this.scoreUI.update(this.score, this.combo)
+    
+    // 检查升级
+    if (this.levelSystem.updateScore(this.score)) {
+      this.showLevelUpMessage()
+      // 更新生成间隔
+      this.spawnInterval = this.levelSystem.getSpawnInterval()
+    }
+  }
+  
+  /**
+   * 显示升级提示
+   */
+  showLevelUpMessage() {
+    const level = this.levelSystem.getCurrentLevel()
+    this.levelUpMessage = `🎉 Level ${level.level}: ${level.name}！`
+    this.levelUpTimer = 120 // 2秒（60fps）
+    this.audioManager.playSound('powerup') // 复用道具音效
   }
   
   /**
@@ -204,8 +227,13 @@ export default class Main {
     this.missedFruits = 0
     this.fruits = []
     this.bombs = []
+    this.powerups = []
     this.spawnTimer = 0
     this.scoreUI.reset()
+    this.levelSystem.reset()
+    this.spawnInterval = this.levelSystem.getSpawnInterval()
+    this.levelUpMessage = null
+    this.levelUpTimer = 0
   }
   
   /**
@@ -264,6 +292,14 @@ export default class Main {
     // 更新道具管理器
     this.powerupManager.update()
     
+    // 更新升级提示计时器
+    if (this.levelUpTimer > 0) {
+      this.levelUpTimer--
+      if (this.levelUpTimer === 0) {
+        this.levelUpMessage = null
+      }
+    }
+    
     // 获取时间缩放（冰冻效果）
     const timeScale = this.powerupManager.getTimeScale()
     
@@ -277,14 +313,20 @@ export default class Main {
     if (this.spawnTimer >= effectiveInterval) {
       this.spawnTimer = 0
       
-      // 75%水果，20%炸弹，5%道具
+      // 从关卡系统获取概率
+      const bombChance = this.levelSystem.getBombChance()
+      const powerupChance = this.levelSystem.getPowerupChance()
+      
       const rand = Math.random()
-      if (rand < 0.75) {
-        this.spawnFruit()
-      } else if (rand < 0.95) {
+      if (rand < powerupChance) {
+        // 道具
+        this.spawnPowerUp()
+      } else if (rand < powerupChance + bombChance) {
+        // 炸弹
         this.spawnBomb()
       } else {
-        this.spawnPowerUp()
+        // 水果
+        this.spawnFruit()
       }
     }
     
@@ -389,6 +431,38 @@ export default class Main {
       ctx.font = '20px Arial'
       ctx.fillText(`Miss: ${this.missedFruits}/${this.maxMissed}`, 10, 60)
       
+      // 显示关卡信息
+      const level = this.levelSystem.getCurrentLevel()
+      ctx.fillStyle = '#ffd93d'
+      ctx.font = 'bold 22px Arial'
+      ctx.textAlign = 'right'
+      ctx.fillText(`Lv.${level.level} ${level.name}`, windowWidth - 10, 40)
+      
+      // 显示升级进度条
+      if (level.scoreTarget !== Infinity) {
+        const barWidth = 200
+        const barHeight = 8
+        const barX = windowWidth - barWidth - 10
+        const barY = 50
+        
+        // 背景
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+        ctx.fillRect(barX, barY, barWidth, barHeight)
+        
+        // 进度
+        const progress = this.levelSystem.getProgress()
+        ctx.fillStyle = '#4ecdc4'
+        ctx.fillRect(barX, barY, barWidth * progress, barHeight)
+        
+        // 目标分数
+        ctx.fillStyle = '#fff'
+        ctx.font = '14px Arial'
+        const scoreToNext = this.levelSystem.getScoreToNext()
+        ctx.fillText(`${scoreToNext}`, windowWidth - 10, 70)
+      }
+      
+      ctx.textAlign = 'left'
+      
       // 显示激活的道具
       const activePowerUps = this.powerupManager.getActivePowerUps()
       if (activePowerUps.length > 0) {
@@ -410,6 +484,20 @@ export default class Main {
           ctx.fillText(`${icons[powerup.type]} ${powerup.remainingSeconds}s`, 10, yOffset)
           yOffset += 35
         })
+      }
+      
+      // 显示升级提示
+      if (this.levelUpMessage) {
+        ctx.save()
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+        ctx.fillRect(0, windowHeight / 2 - 50, windowWidth, 100)
+        
+        ctx.fillStyle = '#ffd93d'
+        ctx.font = 'bold 40px Arial'
+        ctx.textAlign = 'center'
+        ctx.fillText(this.levelUpMessage, windowWidth / 2, windowHeight / 2 + 10)
+        ctx.textAlign = 'left'
+        ctx.restore()
       }
     } else if (this.state === GAME_STATE.OVER) {
       this.gameOverUI.render()
