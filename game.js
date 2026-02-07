@@ -14,6 +14,7 @@ import StartScreen from './js/ui/startScreen'
 import AudioManager from './js/base/audioManager'
 import PowerUpManager from './js/base/powerupManager'
 import LevelSystem from './js/base/levelSystem'
+import EffectsManager from './js/base/effectsManager'
 
 const ctx = canvas.getContext('2d')
 const { windowWidth, windowHeight } = wx.getSystemInfoSync()
@@ -45,6 +46,7 @@ export default class Main {
     this.audioManager = new AudioManager()
     this.powerupManager = new PowerUpManager()
     this.levelSystem = new LevelSystem()
+    this.effectsManager = new EffectsManager(ctx)
     
     // 生成水果的定时器
     this.spawnTimer = 0
@@ -102,6 +104,11 @@ export default class Main {
     const touch = e.touches[0]
     this.blade.move(touch.clientX, touch.clientY)
     
+    // 刀光粒子
+    if (Math.random() < 0.3) {
+      this.effectsManager.createSlashParticles(touch.clientX, touch.clientY, 3)
+    }
+    
     // 检测切割
     this.checkSlice(touch.clientX, touch.clientY)
   }
@@ -127,6 +134,17 @@ export default class Main {
         fruit.slice()
         this.addScore(10)
         this.combo++
+        
+        // 爆炸特效
+        this.effectsManager.createExplosion(
+          fruit.x + fruit.width / 2,
+          fruit.y + fruit.height / 2,
+          15
+        )
+        
+        // 震动反馈
+        this.effectsManager.vibrate()
+        
         this.fruits.splice(i, 1)
         
         // 播放音效
@@ -145,6 +163,19 @@ export default class Main {
       if (powerup.isAlive && powerup.checkHit(x, y)) {
         powerup.collect()
         this.activatePowerUp(powerup.type)
+        
+        // 道具特效
+        const colors = {
+          freeze: '#4ecdc4',
+          double: '#ffd93d',
+          frenzy: '#ff6b6b'
+        }
+        this.effectsManager.createPowerUpEffect(
+          powerup.x + powerup.width / 2,
+          powerup.y + powerup.height / 2,
+          colors[powerup.type]
+        )
+        
         this.powerups.splice(i, 1)
         
         // 播放道具音效
@@ -157,6 +188,18 @@ export default class Main {
       const bomb = this.bombs[i]
       if (bomb.isAlive && bomb.checkHit(x, y)) {
         bomb.explode()
+        
+        // 大爆炸特效
+        this.effectsManager.createExplosion(
+          bomb.x + bomb.width / 2,
+          bomb.y + bomb.height / 2,
+          30,
+          ['#ff6b6b', '#ff4757', '#2c3e50']
+        )
+        
+        // 强震动
+        this.effectsManager.vibrateHeavy()
+        
         this.gameOver()
         
         // 播放爆炸音效
@@ -406,6 +449,9 @@ export default class Main {
     
     // 更新刀光
     this.blade.update()
+    
+    // 更新特效
+    this.effectsManager.update()
   }
   
   /**
@@ -426,6 +472,9 @@ export default class Main {
     
     // 渲染道具
     this.powerups.forEach(powerup => powerup.render())
+    
+    // 渲染特效
+    this.effectsManager.render()
     
     // 渲染刀光
     this.blade.render()
