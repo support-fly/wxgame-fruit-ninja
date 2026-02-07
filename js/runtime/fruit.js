@@ -2,6 +2,7 @@
  * 水果类
  */
 import Sprite from '../base/sprite'
+import PlaceholderRenderer from '../base/placeholder'
 
 const FRUIT_TYPES = [
   'apple', 'banana', 'watermelon', 'orange', 'strawberry', 'grape'
@@ -22,9 +23,12 @@ export default class Fruit extends Sprite {
     // 随机水果类型
     this.type = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)]
     
-    // 加载图片
+    // 加载图片（如果存在）
     this.img = new Image()
     this.img.src = `images/fruits/${this.type}.png`
+    this.imgLoaded = false
+    this.img.onload = () => { this.imgLoaded = true }
+    this.img.onerror = () => { this.imgLoaded = false }
     
     // 粒子效果
     this.particles = []
@@ -69,14 +73,16 @@ export default class Fruit extends Sprite {
     if (this.isSliced) {
       // 渲染粒子
       this.particles.forEach(p => {
-        this.ctx.fillStyle = p.color
-        this.ctx.beginPath()
-        this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2)
-        this.ctx.fill()
+        PlaceholderRenderer.drawParticle(this.ctx, p.x, p.y, p.color)
       })
     } else {
-      // 渲染水果
-      this.ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height)
+      // 优先使用图片，如果图片未加载则使用占位符
+      if (this.imgLoaded && this.img.complete) {
+        this.ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height)
+      } else {
+        // 使用占位符
+        PlaceholderRenderer.drawFruit(this.ctx, 0, 0, this.width, this.type)
+      }
     }
     
     this.ctx.restore()

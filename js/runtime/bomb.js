@@ -2,6 +2,7 @@
  * 炸弹类
  */
 import Sprite from '../base/sprite'
+import PlaceholderRenderer from '../base/placeholder'
 
 export default class Bomb extends Sprite {
   constructor(ctx, x, y, speedX, speedY) {
@@ -17,6 +18,9 @@ export default class Bomb extends Sprite {
     // 加载图片
     this.img = new Image()
     this.img.src = 'images/bomb.png'
+    this.imgLoaded = false
+    this.img.onload = () => { this.imgLoaded = true }
+    this.img.onerror = () => { this.imgLoaded = false }
   }
   
   update() {
@@ -32,7 +36,14 @@ export default class Bomb extends Sprite {
     this.ctx.save()
     this.ctx.translate(this.x + this.width / 2, this.y + this.height / 2)
     this.ctx.rotate(this.rotation)
-    this.ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height)
+    
+    if (this.imgLoaded && this.img.complete) {
+      this.ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height)
+    } else {
+      // 使用占位符
+      PlaceholderRenderer.drawBomb(this.ctx, 0, 0, this.width)
+    }
+    
     this.ctx.restore()
   }
   
