@@ -6,10 +6,12 @@
 import Background from './js/runtime/background'
 import Fruit from './js/runtime/fruit'
 import Bomb from './js/runtime/bomb'
+import PowerUp from './js/runtime/powerup'
 import Blade from './js/player/blade'
 import Score from './js/ui/score'
 import GameOver from './js/ui/gameOver'
 import AudioManager from './js/base/audioManager'
+import PowerUpManager from './js/base/powerupManager'
 
 const ctx = canvas.getContext('2d')
 const { windowWidth, windowHeight } = wx.getSystemInfoSync()
@@ -33,10 +35,12 @@ export default class Main {
     this.background = new Background(ctx)
     this.fruits = []
     this.bombs = []
+    this.powerups = []
     this.blade = new Blade(ctx)
     this.scoreUI = new Score(ctx)
     this.gameOverUI = new GameOver(ctx)
     this.audioManager = new AudioManager()
+    this.powerupManager = new PowerUpManager()
     
     // 生成水果的定时器
     this.spawnTimer = 0
@@ -127,6 +131,19 @@ export default class Main {
       }
     }
     
+    // 检查道具
+    for (let i = this.powerups.length - 1; i >= 0; i--) {
+      const powerup = this.powerups[i]
+      if (powerup.isAlive && powerup.checkHit(x, y)) {
+        powerup.collect()
+        this.activatePowerUp(powerup.type)
+        this.powerups.splice(i, 1)
+        
+        // 播放道具音效
+        this.audioManager.playSound('powerup')
+      }
+    }
+    
     // 检查炸弹
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const bomb = this.bombs[i]
@@ -141,12 +158,31 @@ export default class Main {
   }
   
   /**
+   * 激活道具效果
+   */
+  activatePowerUp(type) {
+    this.powerupManager.activate(type, 5000) // 5秒
+    
+    // 根据道具类型显示提示
+    const messages = {
+      freeze: '⏱️ 时间减速！',
+      double: '×2 双倍分数！',
+      frenzy: '⚡ 水果狂暴！'
+    }
+    
+    console.log(messages[type])
+  }
+  
+  /**
    * 添加分数
    */
   addScore(points) {
     // 连击加成
     const bonus = Math.floor(this.combo / 3)
-    this.score += points + bonus
+    // 道具加成
+    const multiplier = this.powerupManager.getScoreMultiplier()
+    
+    this.score += (points + bonus) * multiplier
     this.scoreUI.update(this.score, this.combo)
   }
   
@@ -206,6 +242,18 @@ export default class Main {
   }
   
   /**
+   * 生成道具
+   */
+  spawnPowerUp() {
+    const types = ['freeze', 'double', 'frenzy']
+    const type = types[Math.floor(Math.random() * types.length)]
+    
+    const x = Math.random() * windowWidth
+    const powerup = new PowerUp(ctx, x, windowHeight, type)
+    this.powerups.push(powerup)
+  }
+  
+  /**
   /**
   /**
    * 更新游戏逻辑
@@ -213,23 +261,53 @@ export default class Main {
   update() {
     if (this.state !== GAME_STATE.PLAYING) return
     
+    // 更新道具管理器
+    this.powerupManager.update()
+    
+    // 获取时间缩放（冰冻效果）
+    const timeScale = this.powerupManager.getTimeScale()
+    
     // 生成水果和炸弹
     this.spawnTimer++
-    if (this.spawnTimer >= this.spawnInterval) {
+    
+    // 狂暴模式加速生成
+    const spawnMultiplier = this.powerupManager.getSpawnSpeedMultiplier()
+    const effectiveInterval = this.spawnInterval / spawnMultiplier
+    
+    if (this.spawnTimer >= effectiveInterval) {
       this.spawnTimer = 0
       
-      // 80%概率生成水果，20%概率生成炸弹
-      if (Math.random() < 0.8) {
+      // 75%水果，20%炸弹，5%道具
+      const rand = Math.random()
+      if (rand < 0.75) {
         this.spawnFruit()
-      } else {
+      } else if (rand < 0.95) {
         this.spawnBomb()
+      } else {
+        this.spawnPowerUp()
       }
     }
     
     // 更新水果
     for (let i = this.fruits.length - 1; i >= 0; i--) {
       const fruit = this.fruits[i]
-      fruit.update()
+      fruit.speedY += fruit.gravity * timeScale
+      fruit.x += fruit.speedX * timeScale
+      fruit.y += fruit.speedY * timeScale
+      fruit.rotation += fruit.rotationSpeed * timeScale
+      
+      // 更新粒子
+      for (let j = fruit.particles.length - 1; j >= 0; j--) {
+        const p = fruit.particles[j]
+        p.x += p.vx * timeScale
+        p.y += p.vy * timeScale
+        p.vy += 0.5 * timeScale
+        p.life -= timeScale
+        
+        if (p.life <= 0) {
+          fruit.particles.splice(j, 1)
+        }
+      }
       
       // 移除屏幕外的水果
       if (fruit.y > windowHeight + 100) {
@@ -251,11 +329,28 @@ export default class Main {
     // 更新炸弹
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const bomb = this.bombs[i]
-      bomb.update()
+      bomb.speedY += bomb.gravity * timeScale
+      bomb.x += bomb.speedX * timeScale
+      bomb.y += bomb.speedY * timeScale
+      bomb.rotation += bomb.rotationSpeed * timeScale
       
       // 移除屏幕外的炸弹
       if (bomb.y > windowHeight + 100) {
         this.bombs.splice(i, 1)
+      }
+    }
+    
+    // 更新道具
+    for (let i = this.powerups.length - 1; i >= 0; i--) {
+      const powerup = this.powerups[i]
+      powerup.speedY += powerup.gravity * timeScale
+      powerup.x += powerup.speedX * timeScale
+      powerup.y += powerup.speedY * timeScale
+      powerup.rotation += powerup.rotationSpeed * timeScale
+      
+      // 移除屏幕外的道具
+      if (powerup.y > windowHeight + 100) {
+        this.powerups.splice(i, 1)
       }
     }
     
@@ -279,6 +374,9 @@ export default class Main {
     // 渲染炸弹
     this.bombs.forEach(bomb => bomb.render())
     
+    // 渲染道具
+    this.powerups.forEach(powerup => powerup.render())
+    
     // 渲染刀光
     this.blade.render()
     
@@ -290,6 +388,29 @@ export default class Main {
       ctx.fillStyle = '#fff'
       ctx.font = '20px Arial'
       ctx.fillText(`Miss: ${this.missedFruits}/${this.maxMissed}`, 10, 60)
+      
+      // 显示激活的道具
+      const activePowerUps = this.powerupManager.getActivePowerUps()
+      if (activePowerUps.length > 0) {
+        let yOffset = 90
+        activePowerUps.forEach(powerup => {
+          const icons = {
+            freeze: '❄️',
+            double: '×2',
+            frenzy: '⚡'
+          }
+          const colors = {
+            freeze: '#4ecdc4',
+            double: '#ffd93d',
+            frenzy: '#ff6b6b'
+          }
+          
+          ctx.fillStyle = colors[powerup.type]
+          ctx.font = 'bold 25px Arial'
+          ctx.fillText(`${icons[powerup.type]} ${powerup.remainingSeconds}s`, 10, yOffset)
+          yOffset += 35
+        })
+      }
     } else if (this.state === GAME_STATE.OVER) {
       this.gameOverUI.render()
     } else if (this.state === GAME_STATE.READY) {
