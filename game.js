@@ -9,6 +9,7 @@ import Bomb from './js/runtime/bomb'
 import Blade from './js/player/blade'
 import Score from './js/ui/score'
 import GameOver from './js/ui/gameOver'
+import AudioManager from './js/base/audioManager'
 
 const ctx = canvas.getContext('2d')
 const { windowWidth, windowHeight } = wx.getSystemInfoSync()
@@ -35,6 +36,7 @@ export default class Main {
     this.blade = new Blade(ctx)
     this.scoreUI = new Score(ctx)
     this.gameOverUI = new GameOver(ctx)
+    this.audioManager = new AudioManager()
     
     // 生成水果的定时器
     this.spawnTimer = 0
@@ -116,7 +118,12 @@ export default class Main {
         this.fruits.splice(i, 1)
         
         // 播放音效
-        this.playSound('slice')
+        this.audioManager.playSound('slice')
+        
+        // 连击音效
+        if (this.combo >= 3) {
+          this.audioManager.playSound('combo')
+        }
       }
     }
     
@@ -128,7 +135,7 @@ export default class Main {
         this.gameOver()
         
         // 播放爆炸音效
-        this.playSound('bomb')
+        this.audioManager.playSound('bomb')
       }
     }
   }
@@ -171,7 +178,7 @@ export default class Main {
   gameOver() {
     this.state = GAME_STATE.OVER
     this.gameOverUI.show(this.score)
-    this.stopSound('bgm')
+    this.audioManager.stopMusic()
   }
   
   /**
@@ -199,22 +206,7 @@ export default class Main {
   }
   
   /**
-   * 播放音效
-   */
-  playSound(name, loop = false) {
-    const audio = wx.createInnerAudioContext()
-    audio.src = `audio/${name}.mp3`
-    audio.loop = loop
-    audio.play()
-  }
-  
   /**
-   * 停止音效
-   */
-  stopSound(name) {
-    // TODO: 实现音效停止
-  }
-  
   /**
    * 更新游戏逻辑
    */
@@ -247,6 +239,7 @@ export default class Main {
         if (fruit.isAlive) {
           this.missedFruits++
           this.combo = 0 // 重置连击
+          this.audioManager.playSound('miss')
           
           if (this.missedFruits >= this.maxMissed) {
             this.gameOver()
