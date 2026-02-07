@@ -1,0 +1,33 @@
+wxgame-fruit-ninja/
+├── game.js              # 游戏主逻辑
+├── game.json            # 游戏配置文件
+├── project.config.json  # 项目配置
+├── js/
+│   ├── base/
+│   │   ├── sprite.js    # 精灵基类
+│   │   └── pool.js      # 对象池
+│   ├── player/
+│   │   └── blade.js     # 刀光效果
+│   ├── runtime/
+│   │   ├── fruit.js     # 水果类
+│   │   ├── bomb.js      # 炸弹类
+│   │   └── background.js # 背景
+│   └── ui/
+│       ├── score.js     # 分数显示
+│       └── gameOver.js  # 游戏结束界面
+├── images/
+│   ├── fruits/          # 水果图片
+│   │   ├── apple.png
+│   │   ├── banana.png
+│   │   ├── watermelon.png
+│   │   └── ...
+│   ├── effects/         # 特效
+│   │   ├── slash.png    # 刀光
+│   │   └── explosion.png # 爆炸
+│   ├── bg.jpg           # 背景图
+│   └── bomb.png         # 炸弹
+├── audio/
+│   ├── slice.mp3        # 切水果音效
+│   ├── bomb.mp3         # 炸弹音效
+│   └── bgm.mp3          # 背景音乐
+└── README.md
